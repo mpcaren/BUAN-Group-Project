@@ -1,5 +1,5 @@
-in_dir <- "Data"
-out_dir <- file.path(in_dir, "converted")
+in_dir <- file.path("Data", "raw")
+out_dir <- file.path("Data", "converted")
 
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
