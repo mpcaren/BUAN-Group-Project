@@ -1,0 +1,282 @@
+---
+title: "Washington Education Results"
+subtitle: "District outcomes, resources, equity, and geography"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: flatly
+    self_contained: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center",
+  out.width = "100%"
+)
+
+library(dplyr)
+library(htmltools)
+library(knitr)
+library(leaflet)
+library(scales)
+library(sf)
+
+find_project_root <- function(start_dir = getwd()) {
+  current_dir <- normalizePath(start_dir, winslash = "/", mustWork = TRUE)
+
+  repeat {
+    expected_data_path <- file.path(
+      current_dir,
+      "Data",
+      "converted",
+      "1. Data for Student Performance Paper 2015 2025.rds"
+    )
+
+    if (file.exists(expected_data_path)) {
+      return(current_dir)
+    }
+
+    parent_dir <- dirname(current_dir)
+    if (identical(parent_dir, current_dir)) {
+      stop("Could not find the project root containing Data/converted.", call. = FALSE)
+    }
+
+    current_dir <- parent_dir
+  }
+}
+
+project_root <- find_project_root()
+figures_dir <- file.path(project_root, "Outputs", "figures")
+data_path <- file.path(
+  project_root,
+  "Data",
+  "converted",
+  "1. Data for Student Performance Paper 2015 2025.rds"
+)
+boundary_dir <- file.path(project_root, "Data", "geo", "wa_unified_school_districts_2025")
+shape_path <- list.files(boundary_dir, pattern = "\\.shp$", full.names = TRUE)[1]
+
+score_data <- readRDS(data_path) |>
+  mutate(
+    nces_lea = as.character(nces_lea),
+    math_score = metMATH_pct * 100,
+    ela_score = metELA_pct * 100
+  ) |>
+  group_by(year, nces_lea, name, county) |>
+  summarize(
+    math_score = mean(math_score, na.rm = TRUE),
+    ela_score = mean(ela_score, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    math_score = if_else(is.nan(math_score), NA_real_, math_score),
+    ela_score = if_else(is.nan(ela_score), NA_real_, ela_score)
+  )
+
+latest_year <- max(score_data$year, na.rm = TRUE)
+
+map_data <- st_read(shape_path, quiet = TRUE) |>
+  st_transform(4326) |>
+  mutate(nces_lea = GEOID) |>
+  left_join(score_data |> filter(year == latest_year), by = "nces_lea")
+
+district_name <- coalesce(map_data$name, map_data$NAME, "Unknown district")
+
+score_map <- leaflet(map_data, options = leafletOptions(zoomControl = TRUE)) |>
+  addProviderTiles(providers$CartoDB.Positron)
+
+score_palette <- colorNumeric(
+  palette = rev(viridisLite::viridis(256)),
+  domain = c(5, 85),
+  na.color = "#d7dde3"
+)
+
+for (subject in c("Math", "ELA")) {
+  score_column <- if (subject == "Math") "math_score" else "ela_score"
+  values <- map_data[[score_column]]
+  labels <- HTML(paste0(
+    "<strong>", htmlEscape(district_name), "</strong><br>",
+    subject, " requirement rate: ",
+    ifelse(is.na(values), "No data", paste0(number(values, accuracy = 0.1), "%")),
+    "<br>Year: ", latest_year
+  ))
+
+  score_map <- score_map |>
+    addPolygons(
+      group = subject,
+      fillColor = score_palette(values),
+      fillOpacity = 0.82,
+      color = "#ffffff",
+      weight = 0.7,
+      label = labels,
+      highlightOptions = highlightOptions(
+        weight = 2,
+        color = "#243b53",
+        fillOpacity = 0.92,
+        bringToFront = TRUE
+      )
+    )
+}
+
+score_map <- score_map |>
+  addLayersControl(
+    overlayGroups = c("Math", "ELA"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  hideGroup("ELA") |>
+  setView(lng = -120.75, lat = 47.4, zoom = 7)
+
+median_map <- leaflet(map_data, options = leafletOptions(zoomControl = TRUE)) |>
+  addProviderTiles(providers$CartoDB.Positron)
+
+median_palette <- colorNumeric(
+  palette = colorRampPalette(c("#d65f5f", "#f7f7f7", "#3b82a0"))(256),
+  domain = c(-50, 50),
+  na.color = "#d7dde3"
+)
+
+for (subject in c("Math", "ELA")) {
+  score_column <- if (subject == "Math") "math_score" else "ela_score"
+  values <- map_data[[score_column]]
+  subject_median <- median(values, na.rm = TRUE)
+  distance <- values - subject_median
+  labels <- HTML(paste0(
+    "<strong>", htmlEscape(district_name), "</strong><br>",
+    subject, " requirement rate: ",
+    ifelse(is.na(values), "No data", paste0(number(values, accuracy = 0.1), "%")),
+    "<br>Median district rate: ", number(subject_median, accuracy = 0.1), "%",
+    "<br>Distance from median: ",
+    ifelse(is.na(distance), "No data", paste0(number(distance, accuracy = 0.1, style_positive = "plus"), " pts")),
+    "<br>Year: ", latest_year
+  ))
+
+  median_map <- median_map |>
+    addPolygons(
+      group = subject,
+      fillColor = median_palette(distance),
+      fillOpacity = 0.82,
+      color = "#ffffff",
+      weight = 0.7,
+      label = labels,
+      highlightOptions = highlightOptions(
+        weight = 2,
+        color = "#243b53",
+        fillOpacity = 0.92,
+        bringToFront = TRUE
+      )
+    )
+}
+
+median_map <- median_map |>
+  addLayersControl(
+    overlayGroups = c("Math", "ELA"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  hideGroup("ELA") |>
+  setView(lng = -120.75, lat = 47.4, zoom = 7)
+
+figure <- function(filename) {
+  include_graphics(file.path(figures_dir, filename))
+}
+```
+
+<style>
+body {
+  color: #2f3437;
+}
+
+h1, h2, h3 {
+  color: #243b53;
+}
+
+.section-intro {
+  color: #697077;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.chart-block {
+  margin-bottom: 34px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #d9dee5;
+}
+
+.leaflet {
+  margin-bottom: 22px;
+}
+</style>
+
+# Overview
+
+This standalone report presents Washington district-level outcomes, resources,
+equity comparisons, and interactive geography. Dollar values shown in the
+results are CPI-adjusted to 2015.
+
+# Outcomes
+
+<p class="section-intro">Statewide Math and ELA requirement rates across the study period.</p>
+
+```{r outcomes-chart}
+figure("wa_test_scores_over_time.png")
+```
+
+# Resources
+
+<p class="section-intro">Teacher salary and instructional spending compared with composite student outcomes.</p>
+
+## Teacher salaries and outcomes
+
+```{r salary-chart}
+figure("wa_salary_vs_scores_scatter.png")
+```
+
+## Instructional spending and outcomes
+
+```{r spending-outcomes-chart}
+figure("viz_spend_final.png")
+```
+
+# Equity
+
+<p class="section-intro">Resources, demographics, and outcomes compared across district poverty levels.</p>
+
+## Spending by poverty quartile
+
+```{r poverty-spending-chart}
+figure("viz_spend_by_poverty.png")
+```
+
+## Student demographics
+
+```{r demographics-chart}
+figure("viz4_demo_comparison.png")
+```
+
+## Pay gap and learning gap
+
+```{r pay-learning-chart}
+figure("viz4_wealth_poverty_profiles.png")
+```
+
+# Explore Maps {.tabset}
+
+The standalone maps show the latest available year, `r latest_year`. Use the
+layer control to switch between Math and ELA.
+
+## Requirement Rates
+
+```{r requirement-map}
+score_map
+```
+
+## Median Comparison
+
+```{r median-map}
+median_map
+```

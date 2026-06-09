@@ -377,6 +377,20 @@ dashboard_css <- "
   }
 "
 
+dashboard_js <- "
+  $(document).on('shown.bs.tab', 'a[data-toggle=\"tab\"]', function() {
+    setTimeout(function() {
+      ['score_map', 'median_map'].forEach(function(id) {
+        var widget = HTMLWidgets.find('#' + id);
+        if (widget && widget.getMap) {
+          widget.getMap().invalidateSize();
+        }
+      });
+      $(window).trigger('resize');
+    }, 300);
+  });
+"
+
 chart_choices <- c(
   "Test scores over time" = "wa_test_scores_over_time.png",
   "Salary and student outcomes" = "wa_salary_vs_scores_scatter.png",
@@ -390,79 +404,115 @@ ui <- navbarPage(
   title = "Washington Education Results",
   id = "main_navigation",
   collapsible = TRUE,
-  header = tags$head(tags$style(HTML(dashboard_css))),
+  header = tags$head(
+    tags$style(HTML(dashboard_css)),
+    tags$script(HTML(dashboard_js))
+  ),
   tabPanel(
-    "Guided Results",
+    "Overview",
     div(
       class = "dashboard-shell",
       div(
         class = "dashboard-intro",
         h1("Washington district outcomes, resources, and equity"),
-        p("Follow the results in order, then use the chart browser and interactive maps to inspect the details. Dollar values shown in the results are CPI-adjusted to 2015.")
+        p("Use the navigation above to move through outcomes, resources, equity, and interactive maps. Dollar values shown in the results are CPI-adjusted to 2015.")
       ),
       step_section(
         "1",
-        "Start with student outcomes",
-        "First, see how Math and ELA performance changed across the study period.",
-        div(
-          class = "chart-grid single",
-          chart_card(
-            "Statewide test-score trend",
-            "wa_test_scores_over_time.png",
-            "Line chart of statewide Math and ELA scores over time"
-          )
-        )
+        "Outcomes",
+        "See how Math and ELA performance changed across the study period."
       ),
       step_section(
         "2",
-        "Compare resources with outcomes",
-        "Next, examine whether salary and instructional spending are associated with stronger student outcomes.",
-        div(
-          class = "chart-grid",
-          chart_card(
-            "Teacher salaries and outcomes",
-            "wa_salary_vs_scores_scatter.png",
-            "Scatter plot comparing teacher salary with composite student outcomes"
-          ),
-          chart_card(
-            "Instructional spending and outcomes",
-            "viz_spend_final.png",
-            "Scatter plot comparing instructional spending per student with composite outcomes"
-          )
-        )
+        "Resources",
+        "Examine whether salary and instructional spending are associated with stronger student outcomes."
       ),
       step_section(
         "3",
-        "Examine distribution and equity",
-        "Finally, compare resources and student characteristics across poverty levels.",
-        div(
-          class = "chart-grid",
-          chart_card(
-            "Spending by poverty quartile",
-            "viz_spend_by_poverty.png",
-            "Line chart of instructional spending by poverty quartile"
-          ),
-          chart_card(
-            "Student demographics",
-            "viz4_demo_comparison.png",
-            "Bar chart comparing student demographics in high-wealth and high-poverty districts"
-          ),
-          chart_card(
-            "Pay gap and learning gap",
-            "viz4_wealth_poverty_profiles.png",
-            "Bar chart comparing salaries and test scores in high-wealth and high-poverty districts"
-          )
-        )
+        "Equity",
+        "Compare resources, demographics, and outcomes across district poverty levels."
       ),
       step_section(
         "4",
         "Explore the geography",
-        "Use the two map pages to inspect district requirement rates and each district's distance from the statewide district median."
+        "Open the nested Explore Maps menu to inspect district requirement rates and distance from the district median."
       )
     )
   ),
   tabPanel(
-    "Chart Browser",
+    "Outcomes",
+    div(
+      class = "dashboard-shell",
+      div(
+        class = "dashboard-intro",
+        h1("Student outcomes"),
+        p("Statewide Math and ELA requirement rates across the study period.")
+      ),
+      div(
+        class = "chart-grid single",
+        chart_card(
+          "Statewide test-score trend",
+          "wa_test_scores_over_time.png",
+          "Line chart of statewide Math and ELA scores over time"
+        )
+      )
+    )
+  ),
+  tabPanel(
+    "Resources",
+    div(
+      class = "dashboard-shell",
+      div(
+        class = "dashboard-intro",
+        h1("Resources and student outcomes"),
+        p("Teacher salary and instructional spending compared with composite student outcomes. Dollar values are CPI-adjusted to 2015.")
+      ),
+      div(
+        class = "chart-grid",
+        chart_card(
+          "Teacher salaries and outcomes",
+          "wa_salary_vs_scores_scatter.png",
+          "Scatter plot comparing teacher salary with composite student outcomes"
+        ),
+        chart_card(
+          "Instructional spending and outcomes",
+          "viz_spend_final.png",
+          "Scatter plot comparing instructional spending per student with composite outcomes"
+        )
+      )
+    )
+  ),
+  tabPanel(
+    "Equity",
+    div(
+      class = "dashboard-shell",
+      div(
+        class = "dashboard-intro",
+        h1("Distribution and equity"),
+        p("Resources, demographics, and outcomes compared across district poverty levels.")
+      ),
+      div(
+        class = "chart-grid",
+        chart_card(
+          "Spending by poverty quartile",
+          "viz_spend_by_poverty.png",
+          "Line chart of instructional spending by poverty quartile"
+        ),
+        chart_card(
+          "Student demographics",
+          "viz4_demo_comparison.png",
+          "Bar chart comparing student demographics in high-wealth and high-poverty districts"
+        ),
+        chart_card(
+          "Pay gap and learning gap",
+          "viz4_wealth_poverty_profiles.png",
+          "Bar chart comparing salaries and test scores in high-wealth and high-poverty districts"
+        )
+      )
+    )
+  ),
+  tabPanel(
+    "All Charts",
     div(
       class = "chart-browser",
       h2("Browse full-size results"),
@@ -470,30 +520,33 @@ ui <- navbarPage(
       div(class = "chart-browser-frame", uiOutput("selected_chart_output"))
     )
   ),
-  tabPanel(
-    "Requirement Map",
-    div(
-      class = "map-page",
+  navbarMenu(
+    "Explore Maps",
+    tabPanel(
+      "Requirement Rates",
       div(
-        class = "map-header",
-        h2("Students meeting state exam requirements"),
-        p("Choose a subject and year, then hover over a district to inspect its requirement rate.")
-      ),
-      map_controls("score"),
-      div(class = "map-frame", leafletOutput("score_map", height = "720px"))
-    )
-  ),
-  tabPanel(
-    "Median Comparison Map",
-    div(
-      class = "map-page",
+        class = "map-page",
+        div(
+          class = "map-header",
+          h2("Students meeting state exam requirements"),
+          p("Choose a subject and year, then hover over a district to inspect its requirement rate.")
+        ),
+        map_controls("score"),
+        div(class = "map-frame", leafletOutput("score_map", height = "720px"))
+      )
+    ),
+    tabPanel(
+      "Median Comparison",
       div(
-        class = "map-header",
-        h2("District requirement rates compared with the median"),
-        p("Districts are colored by percentage-point distance from the median district rate for the selected subject and year.")
-      ),
-      map_controls("median"),
-      div(class = "map-frame", leafletOutput("median_map", height = "720px"))
+        class = "map-page",
+        div(
+          class = "map-header",
+          h2("District requirement rates compared with the median"),
+          p("Districts are colored by percentage-point distance from the median district rate for the selected subject and year.")
+        ),
+        map_controls("median"),
+        div(class = "map-frame", leafletOutput("median_map", height = "720px"))
+      )
     )
   )
 )
