@@ -1,7 +1,7 @@
 library(ggplot2)
 library(dplyr)
-library(tidyr)
 library(scales)
+source(file.path("Scripts", "visualizations", "plot_style.R"))
 
 data_path <- file.path(
   "Data",
@@ -15,89 +15,61 @@ dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 df <- read.csv(data_path, stringsAsFactors = FALSE)
 
-# Filter to rows with valid salary and at least one test score
 df_clean <- df %>%
-  filter(!is.na(meantotalsalary), meantotalsalary > 0) %>%
-  filter(!is.na(metMATH_pct) | !is.na(metELA_pct))
+  filter(!is.na(meantotalsalary_cpi_adjusted), meantotalsalary_cpi_adjusted > 0) %>%
+  filter(!is.na(metMATH_pct), !is.na(metELA_pct)) %>%
+  mutate(composite = ((metMATH_pct + metELA_pct) / 2) * 100)
 
-# Pivot to long: one row per district-year-subject
-df_long <- df_clean %>%
-  select(year, name, meantotalsalary, metMATH_pct, metELA_pct) %>%
-  pivot_longer(
-    cols = c(metMATH_pct, metELA_pct),
-    names_to = "Subject",
-    values_to = "pct_met"
-  ) %>%
-  filter(!is.na(pct_met), pct_met > 0) %>%
-  mutate(
-    Subject   = recode(Subject, metMATH_pct = "Math", metELA_pct = "ELA"),
-    pct_met   = pct_met * 100,
-    # Covid flag for visual callout
-    covid_year = year == 2021
-  )
+r_val <- round(cor(
+  df_clean$meantotalsalary_cpi_adjusted,
+  df_clean$composite,
+  use = "complete.obs"
+), 2)
 
-p <- ggplot(df_long, aes(x = meantotalsalary, y = pct_met, color = Subject)) +
-
-  # Covid year points highlighted with open ring behind them
-  geom_point(
-    data = df_long %>% filter(covid_year),
-    aes(x = meantotalsalary, y = pct_met),
-    shape = 21, size = 3.2, fill = NA,
-    color = "#E24B4A", stroke = 0.8, alpha = 0.5
+p <- ggplot(df_clean, aes(x = meantotalsalary_cpi_adjusted, y = composite)) +
+  geom_point(size = 1.8, shape = 16, color = project_colors$math, alpha = 0.25) +
+  geom_smooth(
+    method = "lm",
+    se = TRUE,
+    linewidth = 1.1,
+    color = project_colors$ink,
+    fill = project_colors$grid,
+    alpha = 0.15
   ) +
-
-  # Main scatter points
-  geom_point(aes(alpha = ifelse(covid_year, 0.55, 0.25)), size = 1.8, shape = 16) +
-
-  # Smooth trend line per subject
-  geom_smooth(method = "lm", se = TRUE, linewidth = 1.1, alpha = 0.12) +
-
-  scale_alpha_identity() +
-
-  scale_color_manual(values = c("Math" = "#378ADD", "ELA" = "#1D9E75")) +
-
+  annotate(
+    "text",
+    x = quantile(df_clean$meantotalsalary_cpi_adjusted, 0.97, na.rm = TRUE),
+    y = 8,
+    label = paste0("r = ", r_val),
+    hjust = 1,
+    size = 3.8,
+    fontface = "bold",
+    color = project_colors$ink
+  ) +
   scale_x_continuous(
     labels = dollar_format(scale = 1e-3, suffix = "K"),
-    breaks = seq(40000, 140000, by = 20000)
+    breaks = seq(20000, 160000, by = 20000)
   ) +
   scale_y_continuous(
     labels = function(x) paste0(x, "%"),
     limits = c(0, 100),
     breaks = seq(0, 100, by = 20)
   ) +
-
-  # Facet by subject for clarity
-  facet_wrap(~ Subject, ncol = 2) +
-
   labs(
-    title    = "Teacher salaries vs. student test scores in Washington State",
-    subtitle = "Each point = one district in one year  |  Line shows linear trend  |  Red rings = 2021 (Covid year)",
-    x        = "Mean total teacher salary",
-    y        = "% of students meeting standard",
-    caption  = "Source: Washington State district-level data"
+    title = "Higher teacher salaries do not increase student outcomes in Washington State, 2015-2025",
+    subtitle = "Each point = one district in one year  |  Dollars are CPI-adjusted to 2015",
+    x = "Mean total teacher salary",
+    y = "Students meeting standard (%)",
+    caption = NULL
   ) +
-
-  theme_minimal(base_size = 13) +
-  theme(
-    plot.title        = element_text(face = "bold", size = 15, margin = margin(b = 4)),
-    plot.subtitle     = element_text(color = "#5F5E5A", size = 10, margin = margin(b = 14)),
-    plot.caption      = element_text(color = "#888780", size = 9, margin = margin(t = 10)),
-    plot.margin       = margin(16, 20, 12, 12),
-    panel.grid.major  = element_blank(),
-    panel.grid.minor  = element_blank(),
-    axis.text         = element_text(color = "#5F5E5A", size = 10),
-    axis.title        = element_text(color = "#5F5E5A", size = 10),
-    strip.text        = element_text(face = "bold", size = 12),
-    legend.position   = "none"
-  )
+  theme_project(base_size = 13, legend_position = "none")
 
 ggsave(
   output_path,
-  plot   = p,
-  width  = 12,
-  height = 6,
-  dpi    = 180,
-  bg     = "white"
+  plot = p,
+  width = 10,
+  height = 7,
+  dpi = 180,
+  bg = "white"
 )
-
 cat("Saved.\n")

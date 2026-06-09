@@ -2,6 +2,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(scales)
+source(file.path("Scripts", "visualizations", "plot_style.R"))
 
 data_path <- file.path(
   "Data",
@@ -16,13 +17,13 @@ dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 df <- read.csv(data_path, stringsAsFactors = FALSE)
 
 df_clean <- df %>%
-  filter(!is.na(pctfrpl), !is.na(meantotalsalary), meantotalsalary > 0) %>%
+  filter(!is.na(pctfrpl), !is.na(meantotalsalary_cpi_adjusted), meantotalsalary_cpi_adjusted > 0) %>%
   filter(!is.na(metMATH_pct) | !is.na(metELA_pct)) %>%
   filter(pctfrpl >= 0, pctfrpl <= 1)
 
 # Salary quartile labels based on full dataset
 df_clean <- df_clean %>%
-  mutate(salary_quartile = ntile(meantotalsalary, 4),
+  mutate(salary_quartile = ntile(meantotalsalary_cpi_adjusted, 4),
          salary_label = case_when(
            salary_quartile == 1 ~ "Q1 (Lowest pay)",
            salary_quartile == 2 ~ "Q2",
@@ -40,39 +41,22 @@ df_long <- df_clean %>%
          pct_met = pct_met * 100,
          pctfrpl = pctfrpl * 100)
 
-salary_colors <- c("Q1 (Lowest pay)" = "#B5D4F4",
-                   "Q2"              = "#378ADD",
-                   "Q3"              = "#185FA5",
-                   "Q4 (Highest pay)"= "#042C53")
-
 p <- ggplot(df_long, aes(x = pctfrpl, y = pct_met, color = salary_label)) +
   geom_point(size = 1.6, alpha = 0.22, shape = 16) +
   geom_smooth(method = "lm", se = FALSE, linewidth = 1.1) +
   facet_wrap(~ Subject, ncol = 2) +
-  scale_color_manual(values = salary_colors, name = "Teacher salary quartile") +
+  scale_color_manual(values = salary_quartile_colors, name = "Teacher salary quartile (2015 dollars)") +
   scale_x_continuous(labels = function(x) paste0(x, "%"), breaks = seq(0, 100, 20)) +
   scale_y_continuous(labels = function(x) paste0(x, "%"), limits = c(0, 100), breaks = seq(0, 100, 20)) +
   labs(
     title    = "Poverty rate vs. student test scores in Washington State",
-    subtitle = "Each point = one district in one year, colored by teacher salary quartile",
+    subtitle = "Each point = one district in one year, colored by CPI-adjusted teacher salary quartile",
     x        = "% students on free/reduced lunch (poverty proxy)",
     y        = "% of students meeting standard",
-    caption  = "Source: Washington State district-level data"
+    caption  = NULL
   ) +
-  theme_minimal(base_size = 13) +
+  theme_project(base_size = 13, legend_position = "top") +
   theme(
-    plot.title       = element_text(face = "bold", size = 15, margin = margin(b = 4)),
-    plot.subtitle    = element_text(color = "#5F5E5A", size = 10, margin = margin(b = 14)),
-    plot.caption     = element_text(color = "#888780", size = 9, margin = margin(t = 10)),
-    plot.margin      = margin(16, 20, 12, 12),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    axis.text        = element_text(color = "#5F5E5A", size = 10),
-    axis.title       = element_text(color = "#5F5E5A", size = 10),
-    strip.text       = element_text(face = "bold", size = 12),
-    legend.position  = "top",
-    legend.title     = element_text(size = 10, face = "bold"),
-    legend.text      = element_text(size = 10),
     legend.key.width = unit(1.2, "cm")
   )
 

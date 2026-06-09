@@ -2,6 +2,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(scales)
+source(file.path("Scripts", "visualizations", "plot_style.R"))
 
 # Load data
 data_path <- file.path(
@@ -50,12 +51,12 @@ p <- ggplot(yearly, aes(x = year, y = pct_met, color = Subject, linetype = Subje
   annotate("rect",
     xmin = covid_xmin, xmax = covid_xmax,
     ymin = -Inf, ymax = Inf,
-    fill = "#E24B4A", alpha = 0.08
+    fill = project_colors$coral, alpha = 0.08
   ) +
   annotate("text",
     x = (covid_xmin + covid_xmax) / 2, y = 68,
     label = "Covid\ndisruption",
-    size = 3, color = "#A32D2D", fontface = "italic", lineheight = 0.9
+    size = 3, color = project_colors$coral, fontface = "italic", lineheight = 0.9
   ) +
 
   # Lines and points
@@ -73,25 +74,25 @@ p <- ggplot(yearly, aes(x = year, y = pct_met, color = Subject, linetype = Subje
   annotate("text",
     x = 2021, y = trough_math + 10,
     label = paste0("Math low: ", round(trough_math, 1), "%"),
-    size = 2.8, color = "#5F5E5A", lineheight = 0.9
+    size = 2.8, color = project_colors$muted, lineheight = 0.9
   ) +
   annotate("segment",
     x = 2021, xend = 2021,
     y = trough_math + 7.5, yend = trough_math + 2,
     arrow = arrow(length = unit(0.2, "cm"), type = "closed"),
-    color = "#888780", linewidth = 0.5
+    color = project_colors$caption, linewidth = 0.5
   ) +
 
   # 2020 missing data annotation
   annotate("text",
     x = 2020, y = 23,
     label = "2020: no data\n(testing suspended)",
-    size = 2.6, color = "#A32D2D", fontface = "italic", lineheight = 0.9
+    size = 2.6, color = project_colors$coral, fontface = "italic", lineheight = 0.9
   ) +
 
   # Color and linetype scales
   scale_color_manual(
-    values = c("Math" = "#378ADD", "ELA" = "#1D9E75")
+    values = subject_colors
   ) +
   scale_linetype_manual(
     values = c("Math" = "solid", "ELA" = "dashed")
@@ -116,25 +117,15 @@ p <- ggplot(yearly, aes(x = year, y = pct_met, color = Subject, linetype = Subje
     y        = "% meeting standard",
     color    = "Subject",
     linetype = "Subject",
-    caption  = "Source: Washington State district-level data  |  Math and ELA % met standard averaged across all districts"
+    caption  = NULL
   ) +
 
   # Theme
-  theme_minimal(base_size = 13) +
+  theme_project(base_size = 13, legend_position = "top") +
   theme(
-    plot.title       = element_text(face = "bold", size = 15, margin = margin(b = 4)),
-    plot.subtitle    = element_text(color = "#5F5E5A", size = 11, margin = margin(b = 14)),
-    plot.caption     = element_text(color = "#888780", size = 9, margin = margin(t = 10)),
-    plot.margin      = margin(16, 24, 12, 12),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    axis.text        = element_text(color = "#5F5E5A", size = 10),
-    axis.title       = element_text(color = "#5F5E5A", size = 10),
     axis.text.x      = element_text(angle = 0, hjust = 0.5),
-    legend.position  = "top",
     legend.justification = "left",
     legend.title     = element_blank(),
-    legend.text      = element_text(size = 11),
     legend.key.width = unit(1.8, "cm")
   )
 

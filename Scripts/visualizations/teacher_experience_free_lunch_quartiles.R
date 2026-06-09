@@ -17,6 +17,7 @@ library(dplyr)
 library(ggplot2)
 library(readr)
 library(scales)
+source(file.path("Scripts", "visualizations", "plot_style.R"))
 
 data_rds_path <- file.path(
   "Data",
@@ -90,20 +91,15 @@ teacher_experience_plot <- ggplot(
     labels = label_number(accuracy = 0.1),
     expand = expansion(mult = c(0.04, 0.08))
   ) +
-  scale_color_brewer(palette = "Dark2", name = "Free lunch quartile") +
+  scale_color_manual(values = free_lunch_quartile_colors, name = "Free lunch quartile") +
   labs(
     title = "Teacher Experience Over Time by Free Lunch Quartile",
     subtitle = "Quartiles are based on district-year percent free/reduced-price lunch in the merged dataset",
     x = "Year",
     y = "Average teacher experience",
-    caption = "Teacher experience is enrollment-weighted within each quartile-year."
+    caption = NULL
   ) +
-  theme_minimal(base_size = 13) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    legend.position = "bottom",
-    panel.grid.minor = element_blank()
-  )
+  theme_project(base_size = 13, legend_position = "bottom")
 
 ggsave(
   filename = output_path,

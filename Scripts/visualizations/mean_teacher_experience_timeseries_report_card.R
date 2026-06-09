@@ -19,6 +19,7 @@ library(ggplot2)
 library(readr)
 library(scales)
 library(stringr)
+source(file.path("Scripts", "visualizations", "plot_style.R"))
 
 report_card_path <- file.path(
   "Data",
@@ -72,8 +73,8 @@ teacher_experience_plot <- ggplot(
   plot_data,
   aes(x = year, y = mean_teacher_experience)
 ) +
-  geom_line(color = "#1b9e77", linewidth = 1.2) +
-  geom_point(color = "#1b9e77", size = 2.7) +
+  geom_line(color = project_colors$teal, linewidth = 1.2) +
+  geom_point(color = project_colors$teal, size = 2.7) +
   scale_x_continuous(breaks = sort(unique(plot_data$year))) +
   scale_y_continuous(
     labels = label_number(accuracy = 0.1),
@@ -84,13 +85,9 @@ teacher_experience_plot <- ggplot(
     subtitle = "Estimated from OSPI Report Card teacher experience bins",
     x = "Year",
     y = "Estimated mean teacher experience",
-    caption = "Experience uses bin midpoints and is weighted by teacher counts."
+    caption = NULL
   ) +
-  theme_minimal(base_size = 13) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    panel.grid.minor = element_blank()
-  )
+  theme_project(base_size = 13, legend_position = "none")
 
 ggsave(
   filename = output_path,

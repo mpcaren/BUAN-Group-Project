@@ -22,13 +22,40 @@ library(dplyr)
 library(htmltools)
 library(scales)
 
+find_project_root <- function(start_dir = getwd()) {
+  current_dir <- normalizePath(start_dir, winslash = "/", mustWork = TRUE)
+
+  repeat {
+    expected_data_path <- file.path(
+      current_dir,
+      "Data",
+      "converted",
+      "1. Data for Student Performance Paper 2015 2025.rds"
+    )
+
+    if (file.exists(expected_data_path)) {
+      return(current_dir)
+    }
+
+    parent_dir <- dirname(current_dir)
+    if (identical(parent_dir, current_dir)) {
+      stop("Could not find the project root containing Data/converted.", call. = FALSE)
+    }
+
+    current_dir <- parent_dir
+  }
+}
+
+project_root <- find_project_root()
+
 data_path <- file.path(
+  project_root,
   "Data",
   "converted",
   "1. Data for Student Performance Paper 2015 2025.rds"
 )
 
-boundary_dir <- file.path("Data", "geo", "wa_unified_school_districts_2025")
+boundary_dir <- file.path(project_root, "Data", "geo", "wa_unified_school_districts_2025")
 boundary_zip <- file.path(boundary_dir, "tl_2025_53_unsd.zip")
 boundary_url <- "https://www2.census.gov/geo/tiger/TIGER2025/UNSD/tl_2025_53_unsd.zip"
 
@@ -136,8 +163,8 @@ ui <- fluidPage(
   ),
   div(
     class = "map-title",
-    h1("Washington District Mean Test Scores"),
-    p("Choose Math or ELA, then hover over a district to see its exact mean score for the selected year.")
+    h1("Washington Students Meeting State Exam Requirements"),
+    p("Choose Math or ELA, then hover over a district to see the percentage of students who met the state requirement on the selected exam.")
   ),
   leafletOutput("district_map", height = "100%"),
   div(
@@ -199,13 +226,13 @@ server <- function(input, output, session) {
       score <- data[[selected_score_column()]][i]
       subject_label <- selected_subject_label()
       score_text <- if (is.na(score)) {
-        paste("No", subject_label, "score available")
+        paste("No", subject_label, "requirement percentage available")
       } else {
         paste0(number(score, accuracy = 0.1), "%")
       }
       HTML(paste0(
         "<strong>", htmlEscape(coalesce(data$name[i], data$NAME[i], "Unknown district")), "</strong><br>",
-        "Mean ", subject_label, " score: ", score_text, "<br>",
+        "Students meeting ", subject_label, " state requirement: ", score_text, "<br>",
         "Year: ", input$year
       ))
     })
@@ -243,7 +270,7 @@ server <- function(input, output, session) {
         position = "bottomright",
         pal = pal,
         values = c(5, 85),
-        title = paste("Mean", selected_subject_label(), "score"),
+        title = paste("Students meeting", selected_subject_label(), "requirement"),
         labFormat = labelFormat(suffix = "%")
       ) |>
       setView(lng = -120.75, lat = 47.4, zoom = 7)
@@ -282,10 +309,14 @@ server <- function(input, output, session) {
         position = "bottomright",
         pal = pal,
         values = c(5, 85),
-        title = paste("Mean", selected_subject_label(), "score"),
+        title = paste("Students meeting", selected_subject_label(), "requirement"),
         labFormat = labelFormat(suffix = "%")
       )
   }, ignoreInit = TRUE)
 }
 
-shinyApp(ui, server)
+app <- shinyApp(ui, server)
+
+if (interactive()) {
+  runApp(app)
+}

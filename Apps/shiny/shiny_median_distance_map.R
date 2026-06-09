@@ -22,13 +22,40 @@ run_median_distance_dashboard <- function() {
   library(htmltools)
   library(scales)
 
+  find_project_root <- function(start_dir = getwd()) {
+    current_dir <- normalizePath(start_dir, winslash = "/", mustWork = TRUE)
+
+    repeat {
+      expected_data_path <- file.path(
+        current_dir,
+        "Data",
+        "converted",
+        "1. Data for Student Performance Paper 2015 2025.rds"
+      )
+
+      if (file.exists(expected_data_path)) {
+        return(current_dir)
+      }
+
+      parent_dir <- dirname(current_dir)
+      if (identical(parent_dir, current_dir)) {
+        stop("Could not find the project root containing Data/converted.", call. = FALSE)
+      }
+
+      current_dir <- parent_dir
+    }
+  }
+
+  project_root <- find_project_root()
+
   data_path <- file.path(
+    project_root,
     "Data",
     "converted",
     "1. Data for Student Performance Paper 2015 2025.rds"
   )
 
-  boundary_dir <- file.path("Data", "geo", "wa_unified_school_districts_2025")
+  boundary_dir <- file.path(project_root, "Data", "geo", "wa_unified_school_districts_2025")
   boundary_zip <- file.path(boundary_dir, "tl_2025_53_unsd.zip")
   boundary_url <- "https://www2.census.gov/geo/tiger/TIGER2025/UNSD/tl_2025_53_unsd.zip"
 
@@ -133,8 +160,8 @@ run_median_distance_dashboard <- function() {
     ),
     div(
       class = "map-title",
-      h1("Washington District Scores Compared With Median"),
-      p("Districts are colored by percentage-point distance from the median district score for the selected subject and year.")
+      h1("Washington State Exam Requirement Rates Compared With Median"),
+      p("Districts are colored by percentage-point distance from the median district percentage of students meeting the selected state exam requirement.")
     ),
     leafletOutput("district_map", height = "100%"),
     div(
@@ -207,7 +234,11 @@ run_median_distance_dashboard <- function() {
         median_score <- data$median_score[i]
         distance <- data$distance_from_median[i]
 
-        score_text <- if (is.na(score)) "No score available" else paste0(number(score, accuracy = 0.1), "%")
+        score_text <- if (is.na(score)) {
+          "No requirement percentage available"
+        } else {
+          paste0(number(score, accuracy = 0.1), "%")
+        }
         median_text <- if (is.na(median_score)) "No median available" else paste0(number(median_score, accuracy = 0.1), "%")
         distance_text <- if (is.na(distance)) {
           "No distance available"
@@ -217,8 +248,8 @@ run_median_distance_dashboard <- function() {
 
         HTML(paste0(
           "<strong>", htmlEscape(coalesce(data$name[i], data$NAME[i], "Unknown district")), "</strong><br>",
-          "Mean ", subject_label, " score: ", score_text, "<br>",
-          "Median district score: ", median_text, "<br>",
+          "Students meeting ", subject_label, " state requirement: ", score_text, "<br>",
+          "Median district requirement percentage: ", median_text, "<br>",
           "Distance from median: ", distance_text, "<br>",
           "Year: ", input$year
         ))
@@ -252,7 +283,7 @@ run_median_distance_dashboard <- function() {
           position = "bottomright",
           pal = pal,
           values = c(-50, 50),
-          title = paste(selected_subject_label(), "pts from median"),
+          title = paste(selected_subject_label(), "requirement pts from median"),
           labFormat = labelFormat(suffix = " pts")
         )
     }

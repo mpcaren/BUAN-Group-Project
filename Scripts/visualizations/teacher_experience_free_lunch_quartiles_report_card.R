@@ -19,6 +19,7 @@ library(ggplot2)
 library(readr)
 library(scales)
 library(stringr)
+source(file.path("Scripts", "visualizations", "plot_style.R"))
 
 merged_data_path <- file.path(
   "Data",
@@ -134,20 +135,15 @@ teacher_experience_plot <- ggplot(
     labels = label_number(accuracy = 0.1),
     expand = expansion(mult = c(0.04, 0.08))
   ) +
-  scale_color_brewer(palette = "Dark2", name = "Free lunch quartile") +
+  scale_color_manual(values = free_lunch_quartile_colors, name = "Free lunch quartile") +
   labs(
     title = "Teacher Experience Over Time by Free Lunch Quartile",
     subtitle = "Teacher experience estimated from OSPI Report Card experience bins",
     x = "Year",
     y = "Estimated average teacher experience",
-    caption = "Experience uses bin midpoints and is weighted by reported teacher counts."
+    caption = NULL
   ) +
-  theme_minimal(base_size = 13) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    legend.position = "bottom",
-    panel.grid.minor = element_blank()
-  )
+  theme_project(base_size = 13, legend_position = "bottom")
 
 ggsave(
   filename = output_path,
