@@ -5,6 +5,6 @@ account: matthewpcaren
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 17489790
-bundleId: 12106977
+bundleId: 12111729
 url: https://matthewpcaren.shinyapps.io/buan-group-project-redesign/
 version: 1
