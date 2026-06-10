@@ -101,7 +101,14 @@ score_data <- raw_data |>
     c(math_score, ela_score, enrollment, pct_low_income, salary_cpi,
       spend_per_student, teacher_experience),
     \(x) if_else(is.nan(x), NA_real_, x)
-  ))
+  )) |>
+  mutate(
+    both_score = if_else(
+      is.na(math_score) | is.na(ela_score),
+      NA_real_,
+      (math_score + ela_score) / 2
+    )
+  )
 
 district_shapes <- st_read(shape_path, quiet = TRUE) |>
   st_transform(4326) |>
@@ -110,8 +117,8 @@ district_shapes <- st_read(shape_path, quiet = TRUE) |>
 available_years <- sort(unique(score_data$year))
 latest_year <- max(available_years)
 
-# Pre-computed extents so map colors stay comparable while animating across years.
-score_values <- c(score_data$math_score, score_data$ela_score)
+# Pre-computed extents so map colors stay comparable across years.
+score_values <- c(score_data$both_score, score_data$math_score, score_data$ela_score)
 score_domain <- c(
   max(0, floor(min(score_values, na.rm = TRUE) / 5) * 5),
   min(100, ceiling(max(score_values, na.rm = TRUE) / 5) * 5)
@@ -120,13 +127,18 @@ score_domain <- c(
 median_distances <- score_data |>
   group_by(year) |>
   mutate(
+    both_dist = both_score - median(both_score, na.rm = TRUE),
     math_dist = math_score - median(math_score, na.rm = TRUE),
     ela_dist = ela_score - median(ela_score, na.rm = TRUE)
   ) |>
   ungroup()
 
 median_domain_max <- ceiling(
-  max(abs(c(median_distances$math_dist, median_distances$ela_dist)), na.rm = TRUE) / 5
+  max(abs(c(
+    median_distances$both_dist,
+    median_distances$math_dist,
+    median_distances$ela_dist
+  )), na.rm = TRUE) / 5
 ) * 5
 
 # Bounding box per district so the search box can fly the map to a selection.
@@ -185,26 +197,29 @@ figure_path <- function(filename) {
 }
 
 result_figure <- function(filename, alt) {
-  tags$img(
-    class = "result-figure",
-    src = figure_path(filename),
-    alt = alt
+  tags$a(
+    class = "figure-link",
+    href = figure_path(filename),
+    target = "_blank",
+    title = "Open full-size chart",
+    tags$img(
+      class = "result-figure",
+      src = figure_path(filename),
+      alt = alt
+    )
   )
 }
 
-chart_card <- function(title, filename, alt, takeaway = NULL, class = "") {
+chart_card <- function(title, filename, alt, class = "") {
   div(
     class = paste("chart-card", class),
     h3(title),
-    result_figure(filename, alt),
-    if (!is.null(takeaway)) {
-      div(class = "chart-takeaway", span(class = "takeaway-tag", "What this shows"), p(takeaway))
-    }
+    result_figure(filename, alt)
   )
 }
 
-insight_box <- function(...) {
-  div(class = "insight-box", icon("lightbulb"), div(class = "insight-text", ...))
+finding_heading <- function(text) {
+  h2(class = "finding-heading", text)
 }
 
 kpi_card <- function(value, label, note = NULL, tone = "neutral") {
@@ -432,33 +447,13 @@ dashboard_css <- "
     color: var(--ink-faint);
   }
 
-  /* ---- Insight callouts ---- */
-
-  .insight-box {
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-    margin: 0 0 22px;
-    padding: 15px 18px;
-    background: var(--teal-soft);
-    border: 1px solid #cfe8e4;
-    border-left: 4px solid var(--teal);
-    border-radius: 10px;
-  }
-
-  .insight-box .fa, .insight-box .far, .insight-box .fas {
-    margin-top: 3px;
+  .finding-heading {
+    margin: 0 0 16px;
     color: var(--teal-dark);
-    font-size: 16px;
+    font-size: 18px;
+    font-weight: 750;
+    line-height: 1.35;
   }
-
-  .insight-text {
-    color: #234c46;
-    font-size: 14.5px;
-    line-height: 1.55;
-  }
-
-  .insight-text strong { color: #18352f; }
 
   /* ---- Chart cards ---- */
 
@@ -502,30 +497,14 @@ dashboard_css <- "
     border-radius: 6px;
   }
 
-  .chart-takeaway {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--line);
+  .figure-link {
+    display: block;
+    border-radius: 6px;
   }
 
-  .takeaway-tag {
-    display: inline-block;
-    margin-bottom: 5px;
-    padding: 2px 9px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: var(--teal-dark);
-    background: var(--teal-soft);
-    border-radius: 999px;
-  }
-
-  .chart-takeaway p {
-    margin: 0;
-    font-size: 13.5px;
-    line-height: 1.55;
-    color: var(--ink-soft);
+  .figure-link:focus-visible {
+    outline: 3px solid rgba(42, 157, 143, 0.35);
+    outline-offset: 3px;
   }
 
   /* ---- Chart browser ---- */
@@ -717,30 +696,6 @@ dashboard_css <- "
 
   .irs--shiny .irs-handle { border-color: var(--teal); }
 
-  .slider-animate-container {
-    text-align: left;
-    margin-top: 2px;
-  }
-
-  .slider-animate-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: var(--teal);
-    color: #ffffff !important;
-    font-size: 11px;
-    opacity: 1;
-    transition: background 0.12s ease;
-  }
-
-  .slider-animate-button:hover {
-    background: var(--teal-dark);
-    text-decoration: none;
-  }
-
   .map-statbar {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -877,10 +832,393 @@ dashboard_css <- "
 
     .kpi-grid { grid-template-columns: minmax(0, 1fr); }
   }
+
+  @media (max-width: 600px) {
+    body {
+      overflow-x: hidden;
+      font-size: 14px;
+    }
+
+    .navbar-header {
+      min-height: 52px;
+    }
+
+    .navbar-default .navbar-brand {
+      max-width: calc(100vw - 72px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 16px;
+      line-height: 22px;
+    }
+
+    .navbar-default .navbar-toggle {
+      margin-top: 9px;
+      margin-bottom: 9px;
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+
+    .navbar-default .navbar-toggle .icon-bar {
+      background-color: #ffffff;
+    }
+
+    .navbar-default .navbar-collapse {
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: none;
+    }
+
+    .navbar-default .navbar-nav {
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+
+    .navbar-default .navbar-nav > li > a {
+      min-height: 44px;
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+
+    .navbar-default .navbar-nav > .active > a,
+    .navbar-default .navbar-nav > .active > a:hover,
+    .navbar-default .navbar-nav > .active > a:focus {
+      box-shadow: inset 3px 0 0 var(--teal);
+    }
+
+    .dashboard-shell,
+    .chart-browser,
+    .map-page {
+      padding: 18px 10px 34px;
+    }
+
+    .dashboard-intro h1,
+    .chart-browser h2,
+    .map-header h2 {
+      font-size: 23px;
+      line-height: 1.18;
+    }
+
+    .dashboard-intro {
+      padding-bottom: 16px;
+    }
+
+    .dashboard-intro p,
+    .map-header p,
+    .chart-browser .browser-sub {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .kpi-card {
+      min-width: 0;
+      padding: 13px 12px;
+      border-radius: 10px;
+    }
+
+    .kpi-value {
+      font-size: 23px;
+    }
+
+    .kpi-label {
+      margin-top: 5px;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .kpi-note {
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .step-list {
+      gap: 9px;
+    }
+
+    .step-card {
+      gap: 11px;
+      padding: 13px 12px;
+      border-radius: 10px;
+    }
+
+    .step-card .step-number {
+      width: 32px;
+      height: 32px;
+      flex-basis: 32px;
+      font-size: 13px;
+    }
+
+    .step-card h2 {
+      font-size: 15px;
+    }
+
+    .step-card p {
+      font-size: 12.5px;
+      line-height: 1.4;
+    }
+
+    .step-card .step-arrow {
+      font-size: 18px;
+    }
+
+    .page-footnote {
+      margin-top: 18px;
+      font-size: 11.5px;
+      line-height: 1.45;
+    }
+
+    .finding-heading {
+      margin-bottom: 12px;
+      font-size: 16px;
+    }
+
+    .chart-grid {
+      gap: 12px;
+    }
+
+    .chart-card {
+      padding: 12px;
+      border-radius: 10px;
+    }
+
+    .chart-card:hover,
+    .step-card:hover {
+      transform: none;
+    }
+
+    .chart-card h3 {
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .result-figure {
+      max-height: none;
+    }
+
+    .browser-caption {
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    .chart-browser .form-group {
+      width: 100%;
+      max-width: none;
+    }
+
+    .chart-browser-frame {
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    .map-header {
+      margin-bottom: 12px;
+    }
+
+    .map-controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 12px;
+      padding: 12px;
+      border-radius: 10px 10px 0 0;
+    }
+
+    .map-controls > div {
+      margin-bottom: 10px;
+    }
+
+    .subject-control,
+    .metric-control,
+    .year-control,
+    .search-control {
+      grid-column: 1 / -1;
+    }
+
+    .map-controls > .cities-control,
+    .map-controls > .reset-control {
+      margin-bottom: 0;
+    }
+
+    .map-controls > .cities-control {
+      justify-self: start;
+    }
+
+    .map-controls > .reset-control {
+      justify-self: stretch;
+    }
+
+    .map-controls > div:last-child {
+      margin-bottom: 0;
+    }
+
+    .map-controls .control-label {
+      margin-bottom: 5px;
+    }
+
+    .map-statbar {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: thin;
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .map-stat {
+      flex: 0 0 47%;
+      min-width: 145px;
+      padding: 9px 12px;
+      border-right: 1px solid var(--line);
+      border-bottom: 0;
+      scroll-snap-align: start;
+    }
+
+    .map-stat .stat-label {
+      font-size: 9.5px;
+      line-height: 1.25;
+    }
+
+    .map-stat .stat-value {
+      font-size: 15px;
+    }
+
+    .map-stat .stat-detail {
+      overflow: hidden;
+      font-size: 10.5px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .subject-control,
+    .metric-control,
+    .year-control,
+    .search-control,
+    .year-control .shiny-input-container,
+    .search-control .shiny-input-container {
+      width: 100%;
+      min-width: 0;
+      max-width: none;
+    }
+
+    .pill-group .shiny-options-group {
+      display: flex;
+      width: 100%;
+    }
+
+    .pill-group .radio-inline {
+      flex: 1 1 auto;
+      min-height: 44px;
+      padding: 11px 10px;
+      text-align: center;
+    }
+
+    .search-control .selectize-input {
+      min-height: 44px;
+      padding-top: 10px;
+      padding-bottom: 8px;
+    }
+
+    .cities-control {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding-bottom: 0;
+    }
+
+    .cities-control label {
+      padding: 10px 0;
+    }
+
+    .reset-control .btn {
+      min-height: 44px;
+      width: 100%;
+    }
+
+    .map-frame {
+      border-radius: 0 0 10px 10px;
+    }
+
+    #explore_map,
+    .map-frame .leaflet {
+      height: 62vh !important;
+      min-height: 430px;
+      max-height: 590px;
+    }
+
+    .leaflet-control-zoom a {
+      width: 36px;
+      height: 36px;
+      line-height: 36px;
+    }
+
+    .leaflet-control-layers,
+    .leaflet-control-scale {
+      font-size: 10px;
+    }
+
+    .leaflet-control-attribution {
+      max-width: 65vw;
+      overflow: hidden;
+      font-size: 8px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .leaflet-control .legend {
+      max-width: 145px;
+      padding: 5px 7px;
+      font-size: 10px;
+      line-height: 14px;
+    }
+
+    .leaflet-popup-content-wrapper {
+      max-height: 70vh;
+      overflow-y: auto;
+      border-radius: 9px;
+    }
+
+    .leaflet-popup-content {
+      width: min(270px, calc(100vw - 72px)) !important;
+      margin: 10px 12px;
+    }
+
+    .district-popup h4 {
+      padding-right: 14px;
+      font-size: 14px;
+    }
+
+    .district-popup td {
+      padding: 3px 0;
+      font-size: 11.5px;
+    }
+
+    .district-popup .popup-spark svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .city-label {
+      font-size: 9.5px;
+    }
+
+    .map-hint {
+      margin-top: 9px;
+      font-size: 11.5px;
+      line-height: 1.45;
+    }
+  }
 "
 
 dashboard_js <- "
   $(document).on('shown.bs.tab', 'a[data-toggle=\"tab\"]', function() {
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      $('.navbar-collapse.in').collapse('hide');
+    }
+
     setTimeout(function() {
       var widget = HTMLWidgets.find('#explore_map');
       if (widget && widget.getMap) {
@@ -906,12 +1244,12 @@ chart_choices <- c(
 )
 
 chart_captions <- c(
-  "wa_test_scores_over_time.png" = "Statewide shares of students meeting the Math and ELA standard each school year. Both lines drop sharply during the Covid disruption and have recovered only partially since.",
-  "wa_salary_vs_scores_scatter.png" = "Each dot is one district in one year. The fitted line is essentially flat-to-negative: districts that pay teachers more do not systematically post better results.",
+  "wa_test_scores_over_time.png" = "Statewide shares of students meeting the Math and ELA standard each school year. Both lines are substantially lower after the 2020 testing pause and have recovered only partially.",
+  "wa_salary_vs_scores_scatter.png" = "Each dot is one district in one year. The fitted line shows a slight negative association between teacher salary and results; it does not estimate the effect of salary.",
   "viz2b_salary_scores_3years.png" = "The same salary-versus-scores comparison shown for three snapshot years. Salaries shift right (rise) over the decade while scores do not move up with them.",
   "viz_spend_final.png" = "Each dot is one district in one year. Higher instructional spending per student is not associated with a higher share of students meeting standard.",
   "viz_spend_by_poverty.png" = "Average instructional spending per student by district poverty quartile. Higher-poverty districts actually spend somewhat more per student than wealthier ones.",
-  "viz3_poverty_vs_scores.png" = "District poverty (share on free/reduced-price lunch) is the strongest predictor of results in the data: scores fall steadily as poverty rises, within every teacher-pay quartile.",
+  "viz3_poverty_vs_scores.png" = "District poverty (share on free/reduced-price lunch) has the strongest observed association with results among the measures shown: scores are lower in districts with higher poverty rates within every teacher-pay quartile.",
   "viz4_demo_comparison.png" = "Who attends high-poverty versus high-wealth districts: high-poverty districts enroll far more Hispanic and English-as-a-second-language students.",
   "viz4_wealth_poverty_profiles.png" = "Teacher pay differs by roughly 9% between high-wealth and high-poverty districts, but the gap in students meeting standard is around 20 percentage points.",
   "teacher_experience_by_free_lunch_quartile.png" = "Average teacher experience by district poverty quartile. The highest-poverty districts consistently have the least-experienced teachers.",
@@ -1011,6 +1349,7 @@ ui <- navbarPage(
   id = "main_navigation",
   collapsible = TRUE,
   header = tags$head(
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
     tags$link(rel = "preconnect", href = "https://fonts.googleapis.com"),
     tags$link(
       rel = "stylesheet",
@@ -1025,10 +1364,9 @@ ui <- navbarPage(
     page_shell(
       "Washington district outcomes, resources, and equity",
       paste(
-        "A decade of district-level results from Washington State, 2015 to 2025:",
-        "how students performed, what districts spent, and how both differ across",
-        "wealthy and poor communities. Dollar values are CPI-adjusted to 2015.",
-        "The headline numbers below are computed directly from the underlying data."
+        "Washington district-level results from 2015 to 2025:",
+        "student performance, resources, and equity.",
+        "Dollar values are CPI-adjusted to 2015."
       ),
       div(
         class = "kpi-grid",
@@ -1059,29 +1397,30 @@ ui <- navbarPage(
         class = "step-list",
         step_card(
           "1", "Outcomes",
-          "How Math and ELA performance changed across the decade, including the Covid drop and partial recovery.",
+          "Math and ELA performance over time.",
           "outcomes"
         ),
         step_card(
           "2", "Resources",
-          "Whether higher teacher pay and instructional spending line up with stronger student results. (Spoiler: barely.)",
+          "Teacher pay and spending compared with results.",
           "resources"
         ),
         step_card(
           "3", "Equity",
-          "How money, teachers, and results are distributed between high-poverty and high-wealth districts.",
+          "Resources and results across district poverty levels.",
           "equity"
         ),
         step_card(
           "4", "Map Explorer",
-          "An interactive district map: search any district, animate across years, and compare each district with the state median.",
+          "Explore district pass rates and profiles.",
           "map"
         )
       ),
       div(
         class = "page-footnote",
         "Rates shown are the share of students meeting the state exam standard. ",
-        "Source: Washington State district-level data, 2015–2025. 2020 testing was suspended statewide."
+        "Source: Washington State district-level data, 2015–2025. 2020 testing was suspended statewide. ",
+        "All comparisons are observational and descriptive; they do not establish causal effects."
       )
     )
   ),
@@ -1091,21 +1430,13 @@ ui <- navbarPage(
     page_shell(
       "Student outcomes",
       "Statewide Math and ELA performance across the study period.",
-      insight_box(
-        HTML(paste0(
-          "<strong>Scores fell during Covid and have not fully recovered.</strong> ",
-          "Math performance dropped from roughly 40% of students meeting standard before 2020 ",
-          "to 29% in 2021, and by 2025 had climbed back only to about 32%. ",
-          "ELA followed the same shape with a smaller drop."
-        ))
-      ),
+      finding_heading("Scores are lower after the 2020 testing pause and have not fully recovered."),
       div(
         class = "chart-grid single",
         chart_card(
           "Statewide test-score trend",
           "wa_test_scores_over_time.png",
-          "Line chart of statewide Math and ELA scores over time",
-          takeaway = chart_captions[["wa_test_scores_over_time.png"]]
+          "Line chart of statewide Math and ELA scores over time"
         )
       )
     )
@@ -1116,34 +1447,23 @@ ui <- navbarPage(
     page_shell(
       "Resources and student outcomes",
       "Teacher salary and instructional spending compared with student results. Dollar values are CPI-adjusted to 2015.",
-      insight_box(
-        HTML(paste0(
-          "<strong>More money has not meant better scores.</strong> ",
-          "Across roughly 1,700 district-years, the relationship between teacher pay and results ",
-          "is slightly negative (r = −0.12), and the same holds for instructional spending per student ",
-          "(r = −0.23). This does not mean money is wasted — high-need districts receive more ",
-          "funding — but raw spending alone does not predict performance."
-        ))
-      ),
+      finding_heading("Spending and scores have a slight negative association in these district-level data."),
       div(
         class = "chart-grid",
         chart_card(
           "Teacher salaries and outcomes",
           "wa_salary_vs_scores_scatter.png",
-          "Scatter plot comparing teacher salary with composite student outcomes",
-          takeaway = chart_captions[["wa_salary_vs_scores_scatter.png"]]
+          "Scatter plot comparing teacher salary with composite student outcomes"
         ),
         chart_card(
           "Instructional spending and outcomes",
           "viz_spend_final.png",
-          "Scatter plot comparing instructional spending per student with composite outcomes",
-          takeaway = chart_captions[["viz_spend_final.png"]]
+          "Scatter plot comparing instructional spending per student with composite outcomes"
         ),
         chart_card(
-          "Salaries rose; scores did not follow",
+          "Salary and score trends differ",
           "viz2b_salary_scores_3years.png",
           "Scatter plot of salary versus scores for 2015, 2021, and 2025",
-          takeaway = chart_captions[["viz2b_salary_scores_3years.png"]],
           class = "span-note"
         )
       )
@@ -1155,45 +1475,33 @@ ui <- navbarPage(
     page_shell(
       "Distribution and equity",
       "Resources, teachers, demographics, and outcomes compared across district poverty levels.",
-      insight_box(
-        HTML(paste0(
-          "<strong>Poverty, not spending, is where the gaps are.</strong> ",
-          "High-poverty districts actually spend slightly more per student and pay teachers only about 9% less, ",
-          "yet roughly 20 percentage points fewer of their students meet standard — and their teachers are ",
-          "consistently the least experienced. District poverty is the strongest single predictor of results in this data."
-        ))
-      ),
+      finding_heading("The largest observed score differences are across district poverty levels."),
       div(
         class = "chart-grid",
         chart_card(
           "Poverty and test scores",
           "viz3_poverty_vs_scores.png",
-          "Scatter plot of district poverty rate versus test scores by salary quartile",
-          takeaway = chart_captions[["viz3_poverty_vs_scores.png"]]
+          "Scatter plot of district poverty rate versus test scores by salary quartile"
         ),
         chart_card(
           "Spending by poverty quartile",
           "viz_spend_by_poverty.png",
-          "Line chart of instructional spending by poverty quartile",
-          takeaway = chart_captions[["viz_spend_by_poverty.png"]]
+          "Line chart of instructional spending by poverty quartile"
         ),
         chart_card(
           "Student demographics",
           "viz4_demo_comparison.png",
-          "Bar chart comparing student demographics in high-wealth and high-poverty districts",
-          takeaway = chart_captions[["viz4_demo_comparison.png"]]
+          "Bar chart comparing student demographics in high-wealth and high-poverty districts"
         ),
         chart_card(
           "Pay gap and learning gap",
           "viz4_wealth_poverty_profiles.png",
-          "Bar chart comparing salaries and test scores in high-wealth and high-poverty districts",
-          takeaway = chart_captions[["viz4_wealth_poverty_profiles.png"]]
+          "Bar chart comparing salaries and test scores in high-wealth and high-poverty districts"
         ),
         chart_card(
           "Teacher experience by poverty quartile",
           "teacher_experience_by_free_lunch_quartile.png",
-          "Line chart of average teacher experience by free-lunch quartile",
-          takeaway = chart_captions[["teacher_experience_by_free_lunch_quartile.png"]]
+          "Line chart of average teacher experience by free-lunch quartile"
         )
       )
     )
@@ -1207,10 +1515,8 @@ ui <- navbarPage(
         class = "map-header",
         h2("Explore districts on the map"),
         p(paste(
-          "Every unified school district in Washington, colored by the share of students",
-          "meeting the state exam standard — or by how far each district sits above or below",
-          "the statewide median. Hover for a quick read; click any district (or search for one)",
-          "for its full profile and ten-year trend."
+          "Explore district pass rates or distance from the statewide median.",
+          "The combined rate averages Math and ELA. Click a district for its profile and trend."
         ))
       ),
       div(
@@ -1220,8 +1526,12 @@ ui <- navbarPage(
           radioButtons(
             inputId = "map_subject",
             label = "Subject",
-            choices = c("Math" = "math_score", "ELA" = "ela_score"),
-            selected = "math_score",
+            choices = c(
+              "Both" = "both_score",
+              "Math" = "math_score",
+              "ELA" = "ela_score"
+            ),
+            selected = "both_score",
             inline = TRUE
           )
         ),
@@ -1230,7 +1540,7 @@ ui <- navbarPage(
           radioButtons(
             inputId = "map_metric",
             label = "Color districts by",
-            choices = c("Requirement rate" = "rate", "Vs. state median" = "median"),
+            choices = c("Pass rate" = "rate", "Vs. state median" = "median"),
             selected = "rate",
             inline = TRUE
           )
@@ -1239,14 +1549,13 @@ ui <- navbarPage(
           class = "year-control",
           sliderInput(
             inputId = "map_year",
-            label = "Year (press ▶ to animate)",
+            label = "Year",
             min = min(available_years),
             max = max(available_years),
             value = latest_year,
             step = 1,
             sep = "",
-            ticks = TRUE,
-            animate = animationOptions(interval = 1400, loop = TRUE)
+            ticks = TRUE
           )
         ),
         div(
@@ -1273,8 +1582,8 @@ ui <- navbarPage(
         class = "map-hint",
         icon("hand-pointer"),
         paste(
-          "Tip: gray districts have no reported data for the selected subject and year",
-          "(2020 testing was suspended statewide). Rates reflect all students expected to test."
+          "Gray districts have no reported data for the selected measure and year.",
+          "The combined rate averages Math and ELA."
         )
       )
     )
@@ -1317,7 +1626,13 @@ server <- function(input, output, session) {
   })
 
   subject_label <- reactive({
-    if (identical(input$map_subject, "ela_score")) "ELA" else "Math"
+    if (identical(input$map_subject, "both_score")) {
+      "Combined Math/ELA"
+    } else if (identical(input$map_subject, "ela_score")) {
+      "ELA"
+    } else {
+      "Math"
+    }
   })
 
   # District data for the selected year, with median distance and rank attached.
@@ -1371,7 +1686,7 @@ server <- function(input, output, session) {
 
       HTML(paste0(
         "<strong>", htmlEscape(coalesce(data$name[i], data$NAME[i], "Unknown district")), "</strong><br>",
-        label, " requirement rate (", input$map_year, "): ",
+        label, " pass rate (", input$map_year, "): ",
         if (is.na(score)) "no data" else format_pct(score), "<br>",
         "Vs. state median: ", format_pts(distance), "<br>",
         rank_text,
@@ -1387,13 +1702,13 @@ server <- function(input, output, session) {
       fill_values <- pmax(pmin(data$distance_from_median, median_domain_max), -median_domain_max)
       pal <- median_palette
       legend_values <- c(-median_domain_max, median_domain_max)
-      legend_title <- paste0(label, " rate, pts from<br>state median (", input$map_year, ")")
+      legend_title <- paste0(label, " pass rate, pts from<br>state median (", input$map_year, ")")
       legend_format <- labelFormat(suffix = " pts")
     } else {
       fill_values <- data$selected_score
       pal <- rate_palette
       legend_values <- score_domain
-      legend_title <- paste0(label, " requirement<br>rate (", input$map_year, ")")
+      legend_title <- paste0(label, " pass<br>rate (", input$map_year, ")")
       legend_format <- labelFormat(suffix = "%")
     }
 
@@ -1505,7 +1820,7 @@ server <- function(input, output, session) {
     div(
       class = "map-statbar",
       stat(
-        sprintf("Median district · %s %d", label, input$map_year),
+        sprintf("Median district pass rate · %s %d", label, input$map_year),
         format_pct(median_rate)
       ),
       stat(
@@ -1565,14 +1880,15 @@ server <- function(input, output, session) {
       paste0(
         sprintf("<div class='popup-section'>Results, %d</div>", input$map_year),
         "<table>",
+        stat_row("Math/ELA average pass rate", format_pct(row1$both_score)),
         stat_row(
-          "Math requirement rate",
+          "Math pass rate",
           paste0(
             format_pct(row1$math_score),
             if (!is.na(math_rank$r[1])) sprintf(" <span style='font-weight:500;color:#8b97a3'>(#%d of %d)</span>", math_rank$r[1], math_rank$n[1]) else ""
           )
         ),
-        stat_row("ELA requirement rate", format_pct(row1$ela_score)),
+        stat_row("ELA pass rate", format_pct(row1$ela_score)),
         stat_row(paste0(subject_label(), " vs. state median"), format_pts(row1$distance_from_median)),
         stat_row("Students expected to test", if (is.na(row1$expected_to_test) || row1$expected_to_test == 0) "—" else comma(row1$expected_to_test)),
         "</table>",

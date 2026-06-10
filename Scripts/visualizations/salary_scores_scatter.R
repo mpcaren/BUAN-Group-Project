@@ -56,8 +56,8 @@ p <- ggplot(df_clean, aes(x = meantotalsalary_cpi_adjusted, y = composite)) +
     breaks = seq(0, 100, by = 20)
   ) +
   labs(
-    title = "Higher teacher salaries do not increase student outcomes in Washington State, 2015-2025",
-    subtitle = "Each point = one district in one year  |  Dollars are CPI-adjusted to 2015",
+    title = "Teacher salary and student outcomes have a slight negative association",
+    subtitle = "Each point = one district in one year  |  Descriptive association, not a causal estimate  |  Dollars are CPI-adjusted to 2015",
     x = "Mean total teacher salary",
     y = "Students meeting standard (%)",
     caption = NULL

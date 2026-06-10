@@ -68,8 +68,8 @@ p <- ggplot(df_clean, aes(x = spend_per_pupil, y = composite)) +
     expand = expansion(mult = c(0.02, 0.02))
   ) +
   labs(
-    title = "More money spent does not always equate to high test scores",
-    subtitle = "Each point = one district in one year  |  2021 excluded  |  Top/bottom 2.5% removed  |  Dollars are CPI-adjusted to 2015",
+    title = "Instructional spending and test scores have a slight negative association",
+    subtitle = "Each point = one district in one year  |  Descriptive association, not a causal estimate  |  2021 excluded  |  Dollars are CPI-adjusted to 2015",
     x = "Instructional spending per student",
     y = "% of students meeting standard (Math + ELA avg.)",
     caption = NULL

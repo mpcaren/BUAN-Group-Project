@@ -50,7 +50,7 @@ p <- ggplot(df_long, aes(x = pctfrpl, y = pct_met, color = salary_label)) +
   scale_y_continuous(labels = function(x) paste0(x, "%"), limits = c(0, 100), breaks = seq(0, 100, 20)) +
   labs(
     title    = "Poverty rate vs. student test scores in Washington State",
-    subtitle = "Each point = one district in one year, colored by CPI-adjusted teacher salary quartile",
+    subtitle = "Each point = one district in one year, colored by salary quartile  |  Descriptive association, not a causal estimate",
     x        = "% students on free/reduced lunch (poverty proxy)",
     y        = "% of students meeting standard",
     caption  = NULL

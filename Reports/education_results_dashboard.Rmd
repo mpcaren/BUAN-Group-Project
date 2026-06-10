@@ -216,7 +216,8 @@ h1, h2, h3 {
 
 This standalone report presents Washington district-level outcomes, resources,
 equity comparisons, and interactive geography. Dollar values shown in the
-results are CPI-adjusted to 2015.
+results are CPI-adjusted to 2015. All comparisons are observational and
+descriptive; they do not establish causal effects.
 
 # Outcomes
 
