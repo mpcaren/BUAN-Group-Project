@@ -1232,28 +1232,20 @@ dashboard_js <- "
 chart_choices <- c(
   "Test scores over time" = "wa_test_scores_over_time.png",
   "Salary and student outcomes (all years)" = "wa_salary_vs_scores_scatter.png",
-  "Salary and student outcomes (2015 / 2021 / 2025)" = "viz2b_salary_scores_3years.png",
   "Spending and student outcomes" = "viz_spend_final.png",
   "Spending by poverty quartile" = "viz_spend_by_poverty.png",
-  "Poverty rate and test scores" = "viz3_poverty_vs_scores.png",
   "Student demographics by district type" = "viz4_demo_comparison.png",
   "Pay gap and learning gap" = "viz4_wealth_poverty_profiles.png",
-  "Teacher experience by poverty quartile" = "teacher_experience_by_free_lunch_quartile.png",
-  "Teacher experience by poverty quartile (report card data)" = "teacher_experience_by_free_lunch_quartile_report_card.png",
   "Average teacher experience over time" = "mean_teacher_experience_timeseries_report_card.png"
 )
 
 chart_captions <- c(
   "wa_test_scores_over_time.png" = "Statewide shares of students meeting the Math and ELA standard each school year. Both lines are substantially lower after the 2020 testing pause and have recovered only partially.",
   "wa_salary_vs_scores_scatter.png" = "Each dot is one district in one year. The fitted line shows a slight negative association between teacher salary and results; it does not estimate the effect of salary.",
-  "viz2b_salary_scores_3years.png" = "The same salary-versus-scores comparison shown for three snapshot years. Salaries shift right (rise) over the decade while scores do not move up with them.",
   "viz_spend_final.png" = "Each dot is one district in one year. Higher instructional spending per student is not associated with a higher share of students meeting standard.",
   "viz_spend_by_poverty.png" = "Average instructional spending per student by district poverty quartile. Higher-poverty districts actually spend somewhat more per student than wealthier ones.",
-  "viz3_poverty_vs_scores.png" = "District poverty (share on free/reduced-price lunch) has the strongest observed association with results among the measures shown: scores are lower in districts with higher poverty rates within every teacher-pay quartile.",
   "viz4_demo_comparison.png" = "Who attends high-poverty versus high-wealth districts: high-poverty districts enroll far more Hispanic and English-as-a-second-language students.",
   "viz4_wealth_poverty_profiles.png" = "Teacher pay differs by roughly 9% between high-wealth and high-poverty districts, but the gap in students meeting standard is around 20 percentage points.",
-  "teacher_experience_by_free_lunch_quartile.png" = "Average teacher experience by district poverty quartile. The highest-poverty districts consistently have the least-experienced teachers.",
-  "teacher_experience_by_free_lunch_quartile_report_card.png" = "The same comparison built from state report-card data, as a robustness check on the experience gap.",
   "mean_teacher_experience_timeseries_report_card.png" = "Statewide average teacher experience over time from report-card data."
 )
 
@@ -1459,12 +1451,6 @@ ui <- navbarPage(
           "Instructional spending and outcomes",
           "viz_spend_final.png",
           "Scatter plot comparing instructional spending per student with composite outcomes"
-        ),
-        chart_card(
-          "Salary and score trends differ",
-          "viz2b_salary_scores_3years.png",
-          "Scatter plot of salary versus scores for 2015, 2021, and 2025",
-          class = "span-note"
         )
       )
     )
@@ -1479,11 +1465,6 @@ ui <- navbarPage(
       div(
         class = "chart-grid",
         chart_card(
-          "Poverty and test scores",
-          "viz3_poverty_vs_scores.png",
-          "Scatter plot of district poverty rate versus test scores by salary quartile"
-        ),
-        chart_card(
           "Spending by poverty quartile",
           "viz_spend_by_poverty.png",
           "Line chart of instructional spending by poverty quartile"
@@ -1497,11 +1478,6 @@ ui <- navbarPage(
           "Pay gap and learning gap",
           "viz4_wealth_poverty_profiles.png",
           "Bar chart comparing salaries and test scores in high-wealth and high-poverty districts"
-        ),
-        chart_card(
-          "Teacher experience by poverty quartile",
-          "teacher_experience_by_free_lunch_quartile.png",
-          "Line chart of average teacher experience by free-lunch quartile"
         )
       )
     )
